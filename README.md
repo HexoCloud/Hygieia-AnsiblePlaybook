@@ -1,6 +1,7 @@
 ## Ansible Playbook to install Capital One's Hygieia
 
-This is a work-in-progress playbook to install the Hygieia Dev Ops Dashboard [github.com/capitalone/hygieia]
+This is a work-in-progress playbook to install the [Hygieia Dev Ops Dashboard][github.com/capitalone/hygieia]
+
 Right now it only install and starts prerequisites then compiles and packages the Github collector, API, and UI.
 I designed it for CentOS 7, specifically the chef/centos-7.0 vagrant box.
 The target machine and port can be changed in the included hosts file.
