@@ -1,0 +1,138 @@
+---
+- hosts: all
+  remote_user: vagrant
+  tasks:
+  - name: Disable SElinux
+    selinux:
+      state=disabled
+    sudo: yes
+
+#rm timezone
+  - name: Delete timezone symlink
+    file:
+      path=/etc/localtime
+      state=absent
+    sudo: yes
+
+#set time zone to pacific
+  - name: Create new timezone symlink for PST
+    file:
+      path=/etc/localtime
+      state=link
+      src=/usr/share/zoneinfo/America/Los_Angeles
+    sudo: yes
+
+  - name: Update all packages
+    yum:
+      name=*
+      state=latest
+    sudo: yes
+
+  - name: Install EPEL
+    yum:
+      name={{item}}
+      state=latest
+    sudo: yes
+    with_items:
+      - epel-release
+
+
+  - name: Install Packages
+    yum:
+      name={{item}}
+      state=latest
+    with_items:
+      - git
+      - vim
+      - mongodb-server
+      - java-1.8.0-openjdk-devel
+      - tomcat
+    sudo: yes
+
+  - name: Group install development tools
+    command: /bin/yum groupinstall -y "Development tools"
+    sudo: yes
+
+  - name: Stop firewalld
+    service:
+      name=firewalld
+      state=stopped
+      enabled=no
+    sudo: yes
+
+  - name: Start mongodb
+    service:
+      name=mongod
+      state=started
+      enabled=yes
+    sudo: yes
+
+  - name: Clone Hygieia
+    git:
+      clone=yes
+      repo=https://github.com/mitchmania/Hygieia.git
+      dest=/home/vagrant/Hygieia
+      version=17
+
+  - name: Get maven 3.3.3
+    get_url:
+      url=http://psg.mtu.edu/pub/apache/maven/maven-3/3.3.3/binaries/apache-maven-3.3.3-bin.tar.gz
+      dest=/home/vagrant
+
+  - name: Get nodejs
+    get_url:
+      url=https://nodejs.org/dist/v0.12.7/node-v0.12.7-linux-x64.tar.gz
+      dest=/home/vagrant
+
+  - name: Untar maven
+    command: /bin/tar xvzf /home/vagrant/apache-maven-3.3.3-bin.tar.gz
+      chdir=/home/vagrant/
+
+  - name: Untar nodejs
+    command: /bin/tar xvzf /home/vagrant/node-v0.12.7-linux-x64.tar.gz
+      chdir=/home/vagrant
+
+#TODO Might not even be needed but fix
+  - name: Add node dir to PATH
+    shell: /usr/bin/echo "export PATH=$PATH:/home/vagrant/node-v0.12.7-linux-x64/bin/" >> /home/vagrant/.bashrc
+
+#Build
+  - name: Run maven on project
+    command: /home/vagrant/apache-maven-3.3.3/bin/mvn clean compile package install
+      chdir=/home/vagrant/Hygieia/
+
+#API
+  - name: Move api.war to webapps
+    command: cp /home/vagrant/Hygieia/api/target/api.war /var/lib/tomcat/webapps/
+    sudo: yes
+
+  - name: Start tomcat server
+    service:
+      name=tomcat
+      state=restarted
+      enabled=yes
+    sudo: yes
+
+#Collector
+#  - name: Run github collector in background
+#    shell: /home/vagrant/apache-maven-3.3.3/bin/mvn spring-boot:run >> /dev/null &
+#      chdir=/home/vagrant/Hygieia/GitHubSourceCodeCollector/
+
+#UI
+  - name: NPM install bower
+    command: /home/vagrant/node-v0.12.7-linux-x64/bin/npm install bower -g
+
+  - name: NPM install gulp
+    command: /home/vagrant/node-v0.12.7-linux-x64/bin/npm install gulp -g
+
+  - name: NPM install
+    command: /home/vagrant/node-v0.12.7-linux-x64/bin/npm install
+      chdir=/home/vagrant/Hygieia/UI
+
+  - name: Bower install
+    command: /home/vagrant/node-v0.12.7-linux-x64/bin/bower install
+      chdir=/home/vagrant/Hygieia/UI
+
+  # - name: Gulp serve in background
+  #   shell: /home/vagrant/node-v0.12.7-linux-x64/bin/gulp serve 
+  #     chdir=/home/vagrant/Hygieia/UI
